@@ -135,3 +135,29 @@ class LaneDetector:
           )
       
       return result_frame
+      
+  def get_lane_number(self, x_position):
+      """Determine which lane a point is in based on its x-coordinate."""
+      for lane_space in self.lane_spaces:
+          lane_number = lane_space['lane_number']
+          left_line = lane_space['left_line']
+          right_line = lane_space['right_line']
+          
+          # Calculate lane boundaries
+          if left_line is None:
+              # Leftmost lane
+              left_x = 0
+              right_x = right_line[0][0]
+          elif right_line is None:
+              # Rightmost lane
+              left_x = left_line[0][0]
+              right_x = self.frame.shape[1]
+          else:
+              # Regular lanes between two lines
+              left_x = left_line[0][0]
+              right_x = right_line[0][0]
+          
+          if left_x <= x_position <= right_x:
+              return lane_number
+              
+      return 0  # Not in any recognized lane

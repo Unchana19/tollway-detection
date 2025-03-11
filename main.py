@@ -5,7 +5,8 @@ import numpy as np
 from trackers import VehicleTracker, Sort
 from detectors import LaneDetector
 from constants import CLASS_NAMES
-  
+from utils.display_utils import draw_detection_boundary, display_table_in_separate_window
+
 if __name__ == "__main__":
   cap = cv2.VideoCapture("input_videos/input_video.mp4")
   
@@ -17,11 +18,19 @@ if __name__ == "__main__":
   
   tracker = Sort()
   
+  # Add tracking variables
+  active_vehicles = {}
+  disappeared_vehicles = {}
+  vehicle_classes = {}
+  
   while cap.isOpened():
     status, frame = cap.read()
     
     if not status:
       break
+    
+    # Store previous frame's active IDs
+    previous_active_ids = set(active_vehicles.keys())
     
     # Get frame dimensions
     height, width = frame.shape[:2]
@@ -59,6 +68,9 @@ if __name__ == "__main__":
           
     trackers = tracker.update(detections)
     
+    # Clear current active vehicles and update with current frame data
+    current_active_vehicles = {}
+    
     for track in trackers:
       x1, y1, x2, y2, id = track
       x1, y1, x2, y2, id = int(x1), int(y1), int(x2), int(y2), int(id)
@@ -67,9 +79,59 @@ if __name__ == "__main__":
       # Display vehicle ID
       cvzone.putTextRect(frame, f"ID: {id}", (x1, y1-20), 1, 1, offset=5)
       cvzone.cornerRect(frame, (x1, y1, w, h), 10, rt=1)
+      
+      # Determine vehicle class from closest detection
+      vehicle_class = None
+      center_x = (x1 + x2) // 2
+      
+      # Find the vehicle class
+      min_distance = float('inf')
+      for i, det in enumerate(detections):
+        det_x1, det_y1, det_x2, det_y2, _ = det
+        det_center_x = (det_x1 + det_x2) / 2
+        det_center_y = (det_y1 + det_y2) / 2
+        dist = ((center_x - det_center_x)**2 + ((y1+y2)/2 - det_center_y)**2)**0.5
+        if dist < min_distance and dist < 50:  # 50 pixels threshold
+          min_distance = dist
+          if i < len(r.boxes):
+            vehicle_class = CLASS_NAMES[int(r.boxes[i].cls[0])]
+      
+      if vehicle_class:
+        vehicle_classes[id] = vehicle_class
+      
+      # Determine which lane the vehicle is in
+      center_x = (x1 + x2) // 2
+      vehicle_lane = lanes_detector.get_lane_number(center_x)
+      
+      # Update active vehicles dictionary
+      current_active_vehicles[id] = {
+        'type': vehicle_classes.get(id, "Unknown"),
+        'lane': vehicle_lane
+      }
+    
+    # Find disappeared vehicles
+    disappeared_ids = previous_active_ids - set(current_active_vehicles.keys())
+    
+    # Record disappeared vehicles by lane
+    for disappeared_id in disappeared_ids:
+      if disappeared_id in active_vehicles:
+        vehicle_info = active_vehicles[disappeared_id]
+        lane_number = vehicle_info['lane']
+        vehicle_type = vehicle_info['type']
+        
+        if lane_number not in disappeared_vehicles:
+          disappeared_vehicles[lane_number] = []
+        
+        disappeared_vehicles[lane_number].append((disappeared_id, vehicle_type))
+    
+    # Update active vehicles for next frame
+    active_vehicles = current_active_vehicles
+    
+    # Display the table of disappeared vehicles in a separate window
+    display_table_in_separate_window(disappeared_vehicles)
     
     # Draw a horizontal line showing the detection boundary
-    cv2.line(frame, (0, roi_start), (width, roi_start), (0, 255, 0), 2)
+    frame = draw_detection_boundary(frame, roi_start, width)
         
     cv2.imshow("Trollway detection", frame)
     if cv2.waitKey(1) & 0xFF == ord("q"):
