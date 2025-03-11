@@ -6,9 +6,9 @@ import datetime
 from trackers import VehicleTracker, Sort
 from detectors import LaneDetector
 from constants import CLASS_NAMES
+from utils import calculate_toll_fee
 from utils.display_utils import (
     draw_detection_boundary, 
-    display_table_in_separate_window,
     display_detection_history_window
 )
 
@@ -136,26 +136,45 @@ if __name__ == "__main__":
         vehicle_type = vehicle_info['type']
         detection_time = vehicle_info.get('first_detected', current_time)
         
+        # Skip 2-wheel vehicles - don't record them in the history
+        if "2-wheel" in vehicle_type:
+            continue
+        
         # Add to lane-specific disappeared vehicles
         if lane_number not in disappeared_vehicles:
           disappeared_vehicles[lane_number] = []
         
         disappeared_vehicles[lane_number].append((disappeared_id, vehicle_type))
         
-        # Add to detection history with payment status (append to the end instead of inserting at the beginning)
-        detection_history.append({
-          'id': disappeared_id,
-          'vehicle_type': vehicle_type,
-          'lane': lane_number,
-          'time': detection_time,
-          'payment_status': "Waiting for payment"
-        })
+        # Calculate toll fee based on vehicle type
+        toll_fee = calculate_toll_fee(vehicle_type)
+        
+        # Check if this ID already exists in detection_history
+        existing_record_index = next((i for i, record in enumerate(detection_history) 
+                                    if record['id'] == disappeared_id), None)
+        
+        # If ID already exists in history, update that record instead of adding a new one
+        if existing_record_index is not None:
+          detection_history[existing_record_index].update({
+            'vehicle_type': vehicle_type,
+            'lane': lane_number,
+            'time': detection_time,
+            'payment_status': "Waiting for payment",
+            'toll_fee': toll_fee
+          })
+        else:
+          # Add to detection history with payment status and toll fee
+          detection_history.append({
+            'id': disappeared_id,
+            'vehicle_type': vehicle_type,
+            'lane': lane_number,
+            'time': detection_time,
+            'payment_status': "Waiting for payment",
+            'toll_fee': toll_fee
+          })
         
     # Update active vehicles for next frame
     active_vehicles = current_active_vehicles
-    
-    # Display the table of disappeared vehicles in a separate window
-    display_table_in_separate_window(disappeared_vehicles)
     
     # Display detection history in a separate window with lane filtering
     display_detection_history_window(detection_history, selected_lane)
