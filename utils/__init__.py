@@ -4,3 +4,4 @@ from .display_utils import (
     display_detection_history_window
 )
 from .calculate_toll_fee import calculate_toll_fee
+from .save_detect_history import save_detection_history_to_csv

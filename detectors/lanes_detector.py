@@ -13,7 +13,7 @@ class LaneDetector:
     
     gray = cv2.cvtColor(self.frame, cv2.COLOR_BGR2GRAY)
     gray = cv2.GaussianBlur(gray, (1, 1), 0)
-    edges = cv2.Canny(gray, 50, 80)
+    edges = cv2.Canny(gray, 50, 70)
     lines = cv2.HoughLinesP(edges, 1, np.pi/180, 100, minLineLength=300, maxLineGap=250)
 
     if lines is not None:
@@ -77,9 +77,6 @@ class LaneDetector:
           'left_line': self.lanes[-1],
           'right_line': None
       })
-      
-      print(self.lanes)
-      print(self.lane_spaces)
     else:
       print("No lines detected")
       

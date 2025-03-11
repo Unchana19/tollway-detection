@@ -234,7 +234,7 @@ def create_detection_history_image(detection_history, width=1200, height=800, se
             bg_color = (240, 240, 240)
         
         # Add colored tag background for vehicle type
-        tag_width = len(vehicle_type) * 15 + 20
+        tag_width = len(vehicle_type) * 12 + 20
         
         # Draw pill-shaped background for tag
         cv2.rectangle(history_image, 

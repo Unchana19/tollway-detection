@@ -1,0 +1,19 @@
+Lane,Vehicle Type,Count
+1,4-wheel,4
+1,6-wheel,1
+1,TOTAL,5
+,,
+2,4-wheel,8
+2,6-wheel,1
+2,TOTAL,9
+,,
+3,4-wheel,6
+3,TOTAL,6
+,,
+4,4-wheel,5
+4,TOTAL,5
+,,
+5,4-wheel,3
+5,6-wheel,1
+5,TOTAL,4
+,,

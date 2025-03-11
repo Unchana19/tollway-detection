@@ -6,11 +6,12 @@ import datetime
 from trackers import VehicleTracker, Sort
 from detectors import LaneDetector
 from constants import CLASS_NAMES
-from utils import calculate_toll_fee
+from utils import calculate_toll_fee, save_detection_history_to_csv
 from utils.display_utils import (
     draw_detection_boundary, 
     display_detection_history_window
 )
+
 
 if __name__ == "__main__":
   cap = cv2.VideoCapture("input_videos/input_video.mp4")
@@ -24,7 +25,7 @@ if __name__ == "__main__":
   tracker = Sort()
   
   # Add tracking variables
-  active_vehicles = {}  # {id: {'type': class_name, 'lane': lane_number, 'first_detected': timestamp}}
+  active_vehicles = {}  # {id: {'type': class_name, 'lane': lane_number, 'first_detected': timestamp, 'passed_threshold': bool}}
   disappeared_vehicles = {}  # {lane_number: [(id, type), ...]}
   vehicle_classes = {}  # {id: class_name}
   detection_history = []  # List of detection records with timestamp and payment status
@@ -45,7 +46,7 @@ if __name__ == "__main__":
     # Create a copy of the frame
     detection_frame = frame.copy()
     # Create a region of interest - bottom 2/3 of the frame
-    roi_start = height // 3  # Start at 1/3 from the top
+    roi_start = (height // 2) + 50  # Start at 1/3 from the top
     roi = detection_frame[roi_start:height, 0:width]
 
     frame = lanes_detector.display_lane(frame)
@@ -90,6 +91,9 @@ if __name__ == "__main__":
       cvzone.putTextRect(frame, f"ID: {id}", (x1, y1-20), 1, 1, offset=5)
       cvzone.cornerRect(frame, (x1, y1, w, h), 10, rt=1)
       
+      # Check if vehicle has passed the ROI threshold (50 pixels below roi_start)
+      passed_threshold = y2 > (roi_start + 100)
+      
       # Determine vehicle class from closest detection
       vehicle_class = None
       center_x = (x1 + x2) // 2
@@ -113,16 +117,19 @@ if __name__ == "__main__":
       center_x = (x1 + x2) // 2
       vehicle_lane = lanes_detector.get_lane_number(center_x)
       
-      # Update active vehicles dictionary, preserving first detection time
+      # Update active vehicles dictionary, preserving first detection time and threshold status
       if id in active_vehicles:
         first_detected = active_vehicles[id].get('first_detected', current_time)
+        # Keep passed_threshold as True once it's set to True
+        passed_threshold = passed_threshold or active_vehicles[id].get('passed_threshold', False)
       else:
         first_detected = current_time
         
       current_active_vehicles[id] = {
         'type': vehicle_classes.get(id, "Unknown"),
         'lane': vehicle_lane,
-        'first_detected': first_detected
+        'first_detected': first_detected,
+        'passed_threshold': passed_threshold  # Track if vehicle has passed the required distance
       }
     
     # Find disappeared vehicles
@@ -132,6 +139,10 @@ if __name__ == "__main__":
     for disappeared_id in disappeared_ids:
       if disappeared_id in active_vehicles:
         vehicle_info = active_vehicles[disappeared_id]
+        # Only record vehicles that have passed the threshold
+        if not vehicle_info.get('passed_threshold', False):
+            continue
+            
         lane_number = vehicle_info['lane']
         vehicle_type = vehicle_info['type']
         detection_time = vehicle_info.get('first_detected', current_time)
@@ -176,6 +187,10 @@ if __name__ == "__main__":
     # Update active vehicles for next frame
     active_vehicles = current_active_vehicles
     
+    
+    # Save detection data to CSV when program ends
+    save_detection_history_to_csv(detection_history)
+  
     # Display detection history in a separate window with lane filtering
     display_detection_history_window(detection_history, selected_lane)
     
@@ -195,3 +210,4 @@ if __name__ == "__main__":
   
   cap.release()
   cv2.destroyAllWindows()
+
