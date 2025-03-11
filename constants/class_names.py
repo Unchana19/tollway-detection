@@ -1,0 +1,1 @@
+CLASS_NAMES = ["2-wheel", "4-wheel", "6-more-wheel", "6-wheel"]
