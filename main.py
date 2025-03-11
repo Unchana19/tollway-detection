@@ -14,14 +14,18 @@ from utils.display_utils import (
 
 
 if __name__ == "__main__":
+  # Load the video
   cap = cv2.VideoCapture("input_videos/input_video.mp4")
   
+  # Load the vehicle tracker model
   vehicle_tracker = VehicleTracker(model_path="models/vehicle_tracker_model.pt")
   
+  # Initialize the lane detector
   first_frame = cap.read()[1]
   lanes_detector = LaneDetector(first_frame)
   lanes_detector.detect()
   
+  # Initialize the SORT tracker
   tracker = Sort()
   
   # Add tracking variables
@@ -45,13 +49,12 @@ if __name__ == "__main__":
     
     # Create a copy of the frame
     detection_frame = frame.copy()
-    # Create a region of interest - bottom 2/3 of the frame
-    roi_start = (height // 2) + 50  # Start at 1/3 from the top
+    # Create a region of interest
+    roi_start = (height // 2) + 50
     roi = detection_frame[roi_start:height, 0:width]
 
     frame = lanes_detector.display_lane(frame)
        
-    # Track vehicles only in the bottom 2/3
     results = vehicle_tracker.track(roi)
     detections = np.empty((0, 5))
     
