@@ -2,10 +2,15 @@ import math
 import cv2
 import cvzone
 import numpy as np
+import datetime
 from trackers import VehicleTracker, Sort
 from detectors import LaneDetector
 from constants import CLASS_NAMES
-from utils.display_utils import draw_detection_boundary, display_table_in_separate_window
+from utils.display_utils import (
+    draw_detection_boundary, 
+    display_table_in_separate_window,
+    display_detection_history_window
+)
 
 if __name__ == "__main__":
   cap = cv2.VideoCapture("input_videos/input_video.mp4")
@@ -19,9 +24,11 @@ if __name__ == "__main__":
   tracker = Sort()
   
   # Add tracking variables
-  active_vehicles = {}
-  disappeared_vehicles = {}
-  vehicle_classes = {}
+  active_vehicles = {}  # {id: {'type': class_name, 'lane': lane_number, 'first_detected': timestamp}}
+  disappeared_vehicles = {}  # {lane_number: [(id, type), ...]}
+  vehicle_classes = {}  # {id: class_name}
+  detection_history = []  # List of detection records with timestamp and payment status
+  selected_lane = 0  # 0 means show all lanes, 1-5 means filter by lane
   
   while cap.isOpened():
     status, frame = cap.read()
@@ -46,6 +53,9 @@ if __name__ == "__main__":
     # Track vehicles only in the bottom 2/3
     results = vehicle_tracker.track(roi)
     detections = np.empty((0, 5))
+    
+    # Get current timestamp for new detections
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     # Track vehicles
     for r in results:
@@ -103,39 +113,66 @@ if __name__ == "__main__":
       center_x = (x1 + x2) // 2
       vehicle_lane = lanes_detector.get_lane_number(center_x)
       
-      # Update active vehicles dictionary
+      # Update active vehicles dictionary, preserving first detection time
+      if id in active_vehicles:
+        first_detected = active_vehicles[id].get('first_detected', current_time)
+      else:
+        first_detected = current_time
+        
       current_active_vehicles[id] = {
         'type': vehicle_classes.get(id, "Unknown"),
-        'lane': vehicle_lane
+        'lane': vehicle_lane,
+        'first_detected': first_detected
       }
     
     # Find disappeared vehicles
     disappeared_ids = previous_active_ids - set(current_active_vehicles.keys())
     
-    # Record disappeared vehicles by lane
+    # Record disappeared vehicles by lane and add to detection history
     for disappeared_id in disappeared_ids:
       if disappeared_id in active_vehicles:
         vehicle_info = active_vehicles[disappeared_id]
         lane_number = vehicle_info['lane']
         vehicle_type = vehicle_info['type']
+        detection_time = vehicle_info.get('first_detected', current_time)
         
+        # Add to lane-specific disappeared vehicles
         if lane_number not in disappeared_vehicles:
           disappeared_vehicles[lane_number] = []
         
         disappeared_vehicles[lane_number].append((disappeared_id, vehicle_type))
-    
+        
+        # Add to detection history with payment status (append to the end instead of inserting at the beginning)
+        detection_history.append({
+          'id': disappeared_id,
+          'vehicle_type': vehicle_type,
+          'lane': lane_number,
+          'time': detection_time,
+          'payment_status': "Waiting for payment"
+        })
+        
     # Update active vehicles for next frame
     active_vehicles = current_active_vehicles
     
     # Display the table of disappeared vehicles in a separate window
     display_table_in_separate_window(disappeared_vehicles)
     
+    # Display detection history in a separate window with lane filtering
+    display_detection_history_window(detection_history, selected_lane)
+    
     # Draw a horizontal line showing the detection boundary
     frame = draw_detection_boundary(frame, roi_start, width)
         
     cv2.imshow("Trollway detection", frame)
-    if cv2.waitKey(1) & 0xFF == ord("q"):
+    
+    # Handle keyboard input
+    key = cv2.waitKey(1) & 0xFF
+    if key == ord("q"):
       break
+    elif key == ord("0"):
+      selected_lane = 0  # Show all lanes
+    elif key >= ord("1") and key <= ord("5"):
+      selected_lane = key - ord("0")  # Show specific lane (1-5)
   
   cap.release()
   cv2.destroyAllWindows()
