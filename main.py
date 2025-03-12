@@ -1,4 +1,5 @@
 import math
+import os
 import cv2
 import cvzone
 import numpy as np
@@ -13,7 +14,7 @@ from utils.display_utils import (
 )
 
 
-if __name__ == "__main__":
+if __name__ == "__main__": 
   # Load the video
   cap = cv2.VideoCapture("input_videos/input_video.mp4")
   
